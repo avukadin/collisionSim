@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"log"
 	"math"
+	"os"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 const (
@@ -21,17 +22,40 @@ const (
 	coeff = 0.9
 	r1 = 30
 	r2 = 3
+	nImages = 6
 )
+
+func (g *Game) loadImages(folder string) {
+	for i := 1; i <= nImages; i++ {
+		filePath := fmt.Sprintf("%s/ball%d.png", folder, i)
+		file, err := os.Open(filePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
+
+		img, _, err := image.Decode(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		ebitenImg := ebiten.NewImageFromImage(img)
+		g.imgs = append(g.imgs, ebitenImg)
+	}
+}
 
 type Game struct {
 	balls []Ball
 	callDuration time.Duration
+	imgs []*ebiten.Image
 }
 
 func main() {
 	ebiten.SetWindowTitle("Particle Collision Simulation")
 	ebiten.SetWindowSize(screenWidth, screenHeight)
+
 	g := Game{}
+	g.loadImages("./images")
 	// balls := GetFallingBalls(100, 10, 3)
 	balls := GetFallingSingleBall(100, r1)
 	// balls = append(balls, GetBallsOnGround(500, 10, r2)...)
@@ -52,8 +76,13 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %.2f, Call Time %v", ebiten.ActualFPS(), g.callDuration))
-	for _, ball := range g.balls {
-		vector.DrawFilledCircle(screen, float32(ball.r.x), float32(ball.r.y), float32(ball.radius), ball.color, false)
+	for i, ball := range g.balls {
+		// Scale image to 10 by 10
+		img := g.imgs[i % nImages]
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Scale(2*ball.radius/float64(img.Bounds().Dx()), 2*ball.radius/float64(img.Bounds().Dy()))
+		op.GeoM.Translate(ball.r.x-ball.radius, ball.r.y-ball.radius)
+		screen.DrawImage(img, op)
 	}
 }
 
