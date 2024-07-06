@@ -1,144 +1,107 @@
 package main
 
-import (
-	"fmt"
-	"image/color"
-	"math"
-	"math/rand"
-)
-
-var colors = []color.Color{
-	hexToRGBA("0096c7"),
-	hexToRGBA("f72585"),
-	hexToRGBA("7209b7"),
-	hexToRGBA("ffd166"),
-	hexToRGBA("f4a261"),
-	hexToRGBA("00cecb"),
-}
-
-func hexToRGBA(hex string) color.RGBA {
-	var r, g, b uint8
-	if _, err := fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b); err != nil {
-		return color.RGBA{}
-	}
-	return color.RGBA{R: r, G: g, B: b, A: 155}
-}
-
 type Ball struct {
 	r Vector // position
 	v Vector // velocity
 
 	radius float64
 	mass float64
-	color color.Color
 	id int
 }
 
-func (b *Ball) addGravity() {
-	b.v.y += ag
-	b.r.y += float64(b.v.y)
+func (b *Ball) addGravity(level float64) {
+	b.v.y += ag*level
 }
 
-func (b *Ball) getNewVelocity(b2 *Ball) Vector {
-	mRatio := (coeff+1)*b2.mass/(b.mass+b2.mass)
+func (b *Ball) updatePosition() {
+	b.r = b.r.add(b.v)
+}
+
+func (b *Ball) addVelocity(v Vector) {
+	b.v = b.v.add(v)
+}
+
+func (b *Ball) isHit(b2 *Ball) bool {
+	dist := b.r.distance(b2.r)
+	return dist <= (b.radius + b2.radius)
+}
+
+
+func (b *Ball) ballHitVelocity(b2 *Ball, Cr float64) Vector {
+	mRatio := (Cr+1)*b2.mass/(b.mass+b2.mass)
 	vDiff := b.v.subtract(b2.v)
 	rDiff := b.r.subtract(b2.r)
 	proj := vDiff.projection(rDiff)
 	return b.v.subtract(proj.multiply(mRatio))
 }
 
-func getBalls(n int, mass float64, radius float64) []Ball{
-	balls := make([]Ball, n)
-	for i := 0; i < n; i++ {
-		ball := Ball{
-			r: Vector{0, 0},
-			v: Vector{0, 0},
-			radius: radius,
-			mass: mass,
-			color: colors[i%len(colors)],
-		}
-		balls[i] = ball
+func (b *Ball) handleWallCollision(padding float64, Cr float64) bool{
+	isHit := false
+	if b.r.x-b.radius <= padding || b.r.x+b.radius >= screenWidth-padding {
+		b.v.x = -Cr*b.v.x
+		isHit = true
 	}
-	return balls
-}
-
-func GetFallingSingleBall(mass float64, radius float64) []Ball{
-	n:=1
-	balls := getBalls(n, mass, radius)
-	var ballsPerLevel float64 = screenWidth/(2*radius)
-	var levels int = int(math.Ceil(float64(n)/float64(ballsPerLevel)))
-	var loc float64 = radius
-	for level := 0; level < levels; level++ {
-		for i := level*int(ballsPerLevel); i < (level+1)*int(ballsPerLevel); i++ {
-			if i >= n {
-				break
-			}
-			loc = screenWidth/2
-			wiggle := rand.Float64() * 2 * radius - radius
-			balls[i].r = Vector{loc + wiggle, radius*float64(level)}
-			balls[i].v = Vector{0, 0}
-		}
+	if b.r.y-b.radius <= padding || b.r.y+b.radius >= screenHeight-padding {
+		b.v.y = -Cr*b.v.y
+		isHit = true
 	}
-
-	return balls
-
-}
-
-func GetFallingBalls(n int, mass float64, radius float64) []Ball{
-	balls := getBalls(n, mass, radius)
-	var ballsPerLevel float64 = screenWidth/(2*radius)
-	var levels int = int(math.Ceil(float64(n)/float64(ballsPerLevel)))
-	var loc float64 = radius
-	interval := (screenWidth-2*radius)/float64(n-1)
-	for level := 0; level < levels; level++ {
-		for i := level*int(ballsPerLevel); i < (level+1)*int(ballsPerLevel); i++ {
-			if i >= n {
-				break
-			}
-			wiggle := rand.Float64() * 2 * radius - radius
-			balls[i].r = Vector{loc + wiggle, radius*float64(level)}
-			balls[i].v = Vector{0, 0}
-			loc += interval+wiggle
-		}
+	//Move out of wall
+	if b.r.x-b.radius < padding {
+		b.r.x = b.radius + padding + 1
 	}
-
-	return balls
-
+	if b.r.x+b.radius > screenWidth-padding {
+		b.r.x = screenWidth - b.radius - padding -1
+	}
+	if b.r.y-b.radius < padding {
+		b.r.y = b.radius + padding + 1
+	}
+	if b.r.y+b.radius > screenHeight-padding {
+		b.r.y = screenHeight - b.radius - padding -1
+	}
+	return isHit
 }
 
 
-func GetBallsOnGround(n int, mass float64, radius float64) []Ball{
-	balls := getBalls(n, mass, radius)
-	var ballsPerLevel float64 = screenWidth/(2*radius)
-	var levels int = int(math.Ceil(float64(n)/float64(ballsPerLevel)))
-	var loc float64 = radius
-	interval := (screenWidth-2*radius)/float64(n-1)
-	for level := 0; level < levels; level++ {
-		for i := level*int(ballsPerLevel); i < (level+1)*int(ballsPerLevel); i++ {
-			if i >= n {
-				break
-			}
-			wiggle := rand.Float64() * 2 * radius - radius
-			balls[i].r = Vector{loc + wiggle, screenHeight - radius*float64(level)}
-			balls[i].v = Vector{0, 0}
-			loc += interval+wiggle
-		}
-	}
-
-	return balls
-}
-
-func GetBallsRandom(n int, mass float64, radius float64) []Ball{
-	balls := getBalls(n, mass, radius)
-	for i := 0; i < n; i++ {
-		balls[i].r = Vector{rand.Float64()*screenWidth, rand.Float64()*screenHeight}
-		if rand.Float64() < 0.5 {
-			balls[i].v = Vector{1, 0}
-		} else {
-			balls[i].v = Vector{-1, 0}
-		}
-	}
 
 
-	return balls
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

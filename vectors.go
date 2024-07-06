@@ -8,6 +8,10 @@ type Vector struct {
 	x, y float64
 }
 
+func (v *Vector) add(v2 Vector) Vector {
+	return Vector{v.x + v2.x, v.y + v2.y}
+}
+
 func (v *Vector) subtract(v2 Vector) Vector {
 	return Vector{v.x - v2.x, v.y - v2.y}
 }
@@ -32,11 +36,43 @@ func (v * Vector) projection(v2 Vector) Vector {
 	return v2.multiply(v.dot(v2)/v2.dot(v2))
 }
 
-func (v *Vector) add(v2 Vector) Vector {
-	return Vector{v.x + v2.x, v.y + v2.y}
-}
-
 func (v *Vector) normalize() Vector {
 	return v.multiply(1/v.distance(Vector{0, 0}))
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
